@@ -89,7 +89,7 @@ After you have inspected the file, use the ghpc binary to create a deployment
 folder by running:
 
 ```bash
-./ghpc create community/examples/workshops/spack-gromacs.yaml --vars project_id=<walkthrough-project-id/>
+./ghpc create community/examples/workshops/spack-gromacs.yaml --vars project_id=<walkthrough-project-id/> --vars spack_cache_mirror_url=https://storage.googleapis.com/pnnl-clouddays22-workshop
 ```
 
 > **_NOTE:_** The `--vars` argument is used to override `project_id` in the
