@@ -19,7 +19,7 @@ vars:
   deployment_name: batch-gromacs
   region: us-central1
   zone: us-central1-c
-  spack_cache_mirror_url:
+  spack_cache_mirror_url: gs://hpc-toolkit-demos
 
 deployment_groups:
 - group: primary
