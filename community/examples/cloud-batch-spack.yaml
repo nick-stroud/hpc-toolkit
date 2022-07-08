@@ -1,0 +1,212 @@
+# Copyright 2022 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+blueprint_name: cloud-batch-spack
+
+vars:
+  project_id:  ## Set GCP Project ID Here ##
+  deployment_name: batch-gromacs
+  region: us-central1
+  zone: us-central1-c
+  spack_cache_mirror_url:
+
+deployment_groups:
+- group: primary
+  modules:
+  - source: modules/network/pre-existing-vpc
+    id: network1
+
+  - source: modules/file-system/filestore
+    id: appfs
+    use: [network1]
+    settings: {local_mount: /apps}
+
+  ## Install Scripts
+  - id: spack
+    source: community/modules/scripts/spack-install
+    settings:
+      install_dir: /apps/spack
+      spack_url: https://github.com/spack/spack
+      spack_ref: v0.18.0
+      log_file: /var/log/spack.log
+      configs:
+      - type: file
+        scope: defaults
+        content: |
+          config:
+            build_stage:
+              - /apps/spack/spack-stage
+      - type: file
+        scope: defaults
+        content: |
+          modules:
+            default:
+              tcl:
+                hash_length: 0
+                all:
+                  conflict:
+                    - '{name}'
+                projections:
+                  all: '{name}/{version}-{compiler.name}-{compiler.version}'
+      # - type: 'file'
+      #   scope: 'site'
+      #   content: |
+      #     packages:
+      #       slurm:
+      #         externals:
+      #           - spec: slurm@21-08-8-2
+      #             prefix: /usr/local
+      #         buildable: False
+      compilers:
+      - gcc@8.2.0 target=x86_64
+      environments:
+      - name: wrfv3
+        type: file
+        content: |
+          spack:
+            definitions:
+            - compilers:
+              - gcc@8.2.0
+            - mpis:
+              - intel-mpi@2018.4.274
+            - mpi_packages:
+              - wrf@3.9.1.1 build_type=dm+sm compile_type=em_real nesting=basic ~pnetcdf
+            specs:
+            - matrix:
+              - - $mpis
+              - - $%compilers
+            - matrix:
+              - - $mpi_packages
+              - - $%compilers
+              - - $^mpis
+      spack_cache_url:
+      - mirror_name: gcs_cache
+        mirror_url: $(vars.spack_cache_mirror_url)
+
+  - source: modules/scripts/startup-script
+    id: spack-build-startup
+    settings:
+      runners:
+      - type: shell
+        source: modules/startup-script/examples/install_ansible.sh
+        destination: install_ansible.sh
+      - $(appfs.install_nfs_client_runner)
+      - $(appfs.mount_runner)
+      # - $(spack.install_spack_deps_runner)
+      # - $(spack.install_spack_runner)
+      - type: shell
+        destination: wrfv3_setup.sh
+        content: |
+          #!/bin/bash
+          source /apps/spack/share/spack/setup-env.sh
+          spack env activate wrfv3
+          chmod -R a+rwX /apps/spack/var/spack/environments/wrfv3
+          mkdir -p /apps/wrfv3
+          chmod a+rwx /apps/wrfv3
+          cd /apps/wrfv3
+          wget --no-verbose https://www2.mmm.ucar.edu/wrf/bench/conus12km_v3911/bench_12km.tar.bz2
+          tar xjf bench_12km.tar.bz2
+      - type: data
+        destination: /apps/wrfv3/submit_wrfv3.sh
+        content: |
+          #!/bin/bash
+          source /apps/spack/share/spack/setup-env.sh
+          spack env activate wrfv3
+          which wrf.exe
+          mkdir --parents /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
+          cd /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
+          cp /apps/wrfv3/bench_12km/* .
+          WRF=`spack location -i wrf`
+          ln -s $WRF/run/* .
+
+          # if [ $BATCH_TASK_INDEX = 0 ]; mpirun -hostfile $BATCH_HOSTS_FILE -np 3 hostname; fi
+          # if [ $BATCH_TASK_INDEX = 0 ]; mpirun  -hostfile $BATCH_HOSTS_FILE -n 60 -ppn ${SLURM_NTASKS_PER_NODE} wrf.exe; fi
+          if [ $BATCH_TASK_INDEX = 0 ] 
+          then 
+            mpirun  -hostfile $BATCH_HOSTS_FILE -np 3 wrf.exe 
+          fi
+      - type: shell
+        content: "shutdown -h +1"
+        destination: shutdown.sh
+
+  # must restart vm to re-initiate subsequent installs
+  - source: modules/compute/vm-instance
+    id: spack-builder
+    use: [network1, appfs, spack-build-startup]
+    settings:
+      name_prefix: spack-builder
+      machine_type: c2-standard-30
+
+
+  - source: modules/scripts/startup-script
+    id: batch-startup
+    settings:
+      runners:
+      - type: shell
+        source: modules/startup-script/examples/install_ansible.sh
+        destination: install_ansible.sh
+      - $(appfs.install_nfs_client_runner)
+      - $(appfs.mount_runner)
+
+  - source: ./community/modules/scheduler/cloud-batch-job
+    id: batch-job
+    use: [network1, appfs, batch-startup]
+    settings:
+      runnable: . /apps/wrfv3/submit_wrfv3.sh;
+      machine_type: n2-standard-4
+      # image:
+      #   family: centos-7
+      #   project: centos-cloud
+
+  - id: batch-login
+    source: ./community/modules/scheduler/cloud-batch-login-node
+    use: [batch-job]
+    outputs: [instructions]
+
+  - id: wait-for-builder
+    source: community/modules/scripts/wait-for-startup
+    settings:
+      instance_name: ((module.spack-builder.name[0]))
+
+  - id: wait-for-login
+    source: community/modules/scripts/wait-for-startup
+    settings:
+      instance_name: $(batch-login.login_node_name)
+
+
+# approx job after editing
+# added barrier and line with task count
+
+# {
+#   "taskGroups": [{
+#     "taskSpec": {
+#       "runnables": [
+#         {
+#           "script": {
+#             "text": ". /apps/wrfv3/submit_wrfv3.sh;"
+#           }
+#         },
+#         { "barrier": {} }
+#       ]
+#     }   , "task_count":3, "task_count_per_node": 1, "require_hosts_file": true, "permissive_ssh": true
+#   }],
+#   "allocationPolicy": {
+#     "instances": [{
+#       "instanceTemplate": "https://www.googleapis.com/compute/v1/projects/nickstroud-demo-2022-02-07/global/instanceTemplates/batch-gromacs-instance-template-20220908231500098300000001"
+#     }]
+#   },
+#   "logsPolicy": {
+#     "destination": "CLOUD_LOGGING"
+#   }
+# }
