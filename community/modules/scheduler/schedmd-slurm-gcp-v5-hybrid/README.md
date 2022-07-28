@@ -1,3 +1,20 @@
+## Description
+This module is a wrapper around the [hybrid-controller] module by SchedMD as
+part of the [slurm-gcp] github repository. The hybrid module serves to create
+the configurations needed to extend an on-premise slurm cluster to one with one
+or more Google Cloud bursting partitions. These partitions will create the
+requested nodes in a GCP project on-demand and scale after a period of not being
+used, in the same way as the [schedmd-slurm-gcp-v5-controller] module
+auto-scales VMs.
+
+### Usages
+
+### Setup
+
+### Manual Configuration
+
+### Example Blueprint
+
 ## License
 <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 Copyright 2022 Google LLC
