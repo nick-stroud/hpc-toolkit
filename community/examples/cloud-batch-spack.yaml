@@ -59,15 +59,6 @@ deployment_groups:
                     - '{name}'
                 projections:
                   all: '{name}/{version}-{compiler.name}-{compiler.version}'
-      # - type: 'file'
-      #   scope: 'site'
-      #   content: |
-      #     packages:
-      #       slurm:
-      #         externals:
-      #           - spec: slurm@21-08-8-2
-      #             prefix: /usr/local
-      #         buildable: False
       compilers:
       - gcc@8.2.0 target=x86_64
       environments:
@@ -103,8 +94,8 @@ deployment_groups:
         destination: install_ansible.sh
       - $(appfs.install_nfs_client_runner)
       - $(appfs.mount_runner)
-      # - $(spack.install_spack_deps_runner)
-      # - $(spack.install_spack_runner)
+      - $(spack.install_spack_deps_runner)
+      - $(spack.install_spack_runner)
       - type: shell
         destination: wrfv3_setup.sh
         content: |
@@ -165,9 +156,6 @@ deployment_groups:
     settings:
       runnable: . /apps/wrfv3/submit_wrfv3.sh;
       machine_type: n2-standard-4
-      # image:
-      #   family: centos-7
-      #   project: centos-cloud
 
   - id: batch-login
     source: ./community/modules/scheduler/cloud-batch-login-node
