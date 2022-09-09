@@ -16,7 +16,7 @@ blueprint_name: cloud-batch-spack
 
 vars:
   project_id:  ## Set GCP Project ID Here ##
-  deployment_name: batch-gromacs
+  deployment_name: batch-wrf
   region: us-central1
   zone: us-central1-c
   spack_cache_mirror_url: gs://hpc-toolkit-demos
@@ -24,15 +24,15 @@ vars:
 deployment_groups:
 - group: primary
   modules:
-  - source: modules/network/pre-existing-vpc
-    id: network1
-
-  - source: modules/file-system/filestore
-    id: appfs
+  - id: network1
+    source: modules/network/pre-existing-vpc
+    
+  ### Software & Script Installation ###
+  - id: appfs
+    source: modules/file-system/filestore
     use: [network1]
     settings: {local_mount: /apps}
 
-  ## Install Scripts
   - id: spack
     source: community/modules/scripts/spack-install
     settings:
@@ -85,8 +85,8 @@ deployment_groups:
       - mirror_name: gcs_cache
         mirror_url: $(vars.spack_cache_mirror_url)
 
-  - source: modules/scripts/startup-script
-    id: spack-build-startup
+  - id: spack-build-startup
+    source: modules/scripts/startup-script
     settings:
       runners:
       - type: shell
@@ -114,15 +114,12 @@ deployment_groups:
           #!/bin/bash
           source /apps/spack/share/spack/setup-env.sh
           spack env activate wrfv3
-          which wrf.exe
           mkdir --parents /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
           cd /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
           cp /apps/wrfv3/bench_12km/* .
           WRF=`spack location -i wrf`
           ln -s $WRF/run/* .
 
-          # if [ $BATCH_TASK_INDEX = 0 ]; mpirun -hostfile $BATCH_HOSTS_FILE -np 3 hostname; fi
-          # if [ $BATCH_TASK_INDEX = 0 ]; mpirun  -hostfile $BATCH_HOSTS_FILE -n 60 -ppn ${SLURM_NTASKS_PER_NODE} wrf.exe; fi
           if [ $BATCH_TASK_INDEX = 0 ] 
           then 
             mpirun  -hostfile $BATCH_HOSTS_FILE -np 3 wrf.exe 
@@ -132,16 +129,16 @@ deployment_groups:
         destination: shutdown.sh
 
   # must restart vm to re-initiate subsequent installs
-  - source: modules/compute/vm-instance
-    id: spack-builder
+  - id: spack-builder
+    source: modules/compute/vm-instance
     use: [network1, appfs, spack-build-startup]
     settings:
       name_prefix: spack-builder
       machine_type: c2-standard-30
 
-
-  - source: modules/scripts/startup-script
-    id: batch-startup
+  ### Batch Modules ###
+  - id: batch-startup
+    source: modules/scripts/startup-script
     settings:
       runners:
       - type: shell
@@ -150,8 +147,8 @@ deployment_groups:
       - $(appfs.install_nfs_client_runner)
       - $(appfs.mount_runner)
 
-  - source: ./community/modules/scheduler/cloud-batch-job
-    id: batch-job
+  - id: batch-job
+    source: ./community/modules/scheduler/cloud-batch-job
     use: [network1, appfs, batch-startup]
     settings:
       runnable: . /apps/wrfv3/submit_wrfv3.sh;
