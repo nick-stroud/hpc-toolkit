@@ -159,15 +159,15 @@ deployment_groups:
     use: [batch-job]
     outputs: [instructions]
 
-  # - id: wait-for-builder
-  #   source: community/modules/scripts/wait-for-startup
-  #   settings:
-  #     instance_name: ((module.spack-builder.name[0]))
+  - id: wait-for-builder
+    source: community/modules/scripts/wait-for-startup
+    settings:
+      instance_name: ((module.spack-builder.name[0]))
 
-  # - id: wait-for-login
-  #   source: community/modules/scripts/wait-for-startup
-  #   settings:
-  #     instance_name: $(batch-login.login_node_name)
+  - id: wait-for-login
+    source: community/modules/scripts/wait-for-startup
+    settings:
+      instance_name: $(batch-login.login_node_name)
 
 
 # approx job after editing
