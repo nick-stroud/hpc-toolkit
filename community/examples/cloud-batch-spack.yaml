@@ -26,7 +26,7 @@ deployment_groups:
   modules:
   - id: network1
     source: modules/network/pre-existing-vpc
-    
+
   ### Software & Script Installation ###
   - id: appfs
     source: modules/file-system/filestore
@@ -37,8 +37,6 @@ deployment_groups:
     source: community/modules/scripts/spack-install
     settings:
       install_dir: /apps/spack
-      spack_url: https://github.com/spack/spack
-      spack_ref: v0.18.0
       log_file: /var/log/spack.log
       configs:
       - type: file
@@ -120,9 +118,9 @@ deployment_groups:
           WRF=`spack location -i wrf`
           ln -s $WRF/run/* .
 
-          if [ $BATCH_TASK_INDEX = 0 ] 
-          then 
-            mpirun  -hostfile $BATCH_HOSTS_FILE -np 6 -ppn 2 wrf.exe 
+          if [ $BATCH_TASK_INDEX = 0 ]
+          then
+            mpirun  -hostfile $BATCH_HOSTS_FILE -np 6 -ppn 2 wrf.exe
           fi
       - type: shell
         content: "shutdown -h +1"
@@ -153,6 +151,8 @@ deployment_groups:
     settings:
       runnable: . /apps/wrfv3/submit_wrfv3.sh;
       machine_type: n2-standard-4
+      task_count: 3
+      mpi_mode: true
 
   - id: batch-login
     source: ./community/modules/scheduler/cloud-batch-login-node
@@ -168,30 +168,3 @@ deployment_groups:
     source: community/modules/scripts/wait-for-startup
     settings:
       instance_name: $(batch-login.login_node_name)
-
-
-# approx job after editing
-# added barrier and line with task count
-
-# {
-#   "taskGroups": [{
-#     "taskSpec": {
-#       "runnables": [
-#         {
-#           "script": {
-#             "text": ". /apps/wrfv3/submit_wrfv3.sh;"
-#           }
-#         },
-#         { "barrier": {} }
-#       ]
-#     }   , "task_count":3, "task_count_per_node": 1, "require_hosts_file": true, "permissive_ssh": true
-#   }],
-#   "allocationPolicy": {
-#     "instances": [{
-#       "instanceTemplate": "https://www.googleapis.com/compute/v1/projects/nickstroud-demo-2022-02-07/global/instanceTemplates/batch-gromacs-instance-template-20220908231500098300000001"
-#     }]
-#   },
-#   "logsPolicy": {
-#     "destination": "CLOUD_LOGGING"
-#   }
-# }
