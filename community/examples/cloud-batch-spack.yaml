@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
+
+## Instructions
+
+# git clone git@github.com:nick-stroud/hpc-toolkit.git
+# cd hpc-toolkit
+# git checkout batch_end2end_example
+# make
+# ./ghpc create -w --vars project_id=<project_id>
+# terraform -chdir=batch-wrf/primary init
+# terraform -chdir=batch-wrf/primary apply --auto-approve
+
+## Wait 30 minutes; spack-builder-0 VM will shut down when software install is complete
+## SSH to login node
+## Submit job
+
 blueprint_name: cloud-batch-spack
 
 vars:
@@ -106,22 +121,6 @@ deployment_groups:
           cd /apps/wrfv3
           wget --no-verbose https://www2.mmm.ucar.edu/wrf/bench/conus12km_v3911/bench_12km.tar.bz2
           tar xjf bench_12km.tar.bz2
-      - type: data
-        destination: /apps/wrfv3/submit_wrfv3.sh
-        content: |
-          #!/bin/bash
-          source /apps/spack/share/spack/setup-env.sh
-          spack env activate wrfv3
-          mkdir --parents /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
-          cd /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
-          cp /apps/wrfv3/bench_12km/* .
-          WRF=`spack location -i wrf`
-          ln -s $WRF/run/* .
-
-          if [ $BATCH_TASK_INDEX = 0 ]
-          then
-            mpirun  -hostfile $BATCH_HOSTS_FILE -np 6 -ppn 2 wrf.exe
-          fi
       - type: shell
         content: "shutdown -h +1"
         destination: shutdown.sh
@@ -139,11 +138,30 @@ deployment_groups:
     source: modules/scripts/startup-script
     settings:
       runners:
-      - type: shell
-        source: modules/startup-script/examples/install_ansible.sh
-        destination: install_ansible.sh
       - $(appfs.install_nfs_client_runner)
-      - $(appfs.mount_runner)
+      - type: shell
+        content: mkdir -p /apps && mount -t nfs 10.156.151.74:/nfsshare /apps
+        destination: mount_apps_fs.sh
+      - $(spack.setup_spack_runner)
+      - type: data
+        destination: /apps/wrfv3/submit_wrfv3.sh
+        content: |
+          #!/bin/bash
+          source /apps/spack/share/spack/setup-env.sh
+          spack env activate wrfv3
+          mkdir --parents /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
+          cd /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
+          cp /apps/wrfv3/bench_12km/* .
+          WRF=`spack location -i wrf`
+          ln -s $WRF/run/* .
+
+          if [ $BATCH_TASK_INDEX = 0 ]
+          then
+            echo "nstest about to run mpi"
+            mpirun  -hostfile $BATCH_HOSTS_FILE -np 4 -ppn 2 wrf.exe
+            echo "nstest finished running mpi"ls
+            
+          fi
 
   - id: batch-job
     source: ./community/modules/scheduler/cloud-batch-job
@@ -151,7 +169,8 @@ deployment_groups:
     settings:
       runnable: . /apps/wrfv3/submit_wrfv3.sh;
       machine_type: n2-standard-4
-      task_count: 3
+      job_id: wrf-mpi-2-node
+      task_count: 2
       mpi_mode: true
 
   - id: batch-login
