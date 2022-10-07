@@ -52,7 +52,6 @@ deployment_groups:
     source: community/modules/scripts/spack-install
     settings:
       install_dir: /apps/spack
-      log_file: /var/log/spack.log
       configs:
       - type: file
         scope: defaults
@@ -121,6 +120,21 @@ deployment_groups:
           cd /apps/wrfv3
           wget --no-verbose https://www2.mmm.ucar.edu/wrf/bench/conus12km_v3911/bench_12km.tar.bz2
           tar xjf bench_12km.tar.bz2
+      - type: data
+        destination: /apps/wrfv3/submit_wrfv3.sh
+        content: |
+          #!/bin/bash
+          source /apps/spack/share/spack/setup-env.sh
+          spack env activate wrfv3
+          if [ $BATCH_TASK_INDEX = 0 ]
+          then
+            mkdir --parents /apps/jobs/${BATCH_JOB_ID}
+            cd /apps/jobs/${BATCH_JOB_ID}
+            cp /apps/wrfv3/bench_12km/* .
+            WRF=`spack location -i wrf`
+            ln -s $WRF/run/* .
+            mpirun -hostfile $BATCH_HOSTS_FILE -np 60 -ppn 30 /apps/jobs/${BATCH_JOB_ID}/wrf.exe
+          fi
       - type: shell
         content: "shutdown -h +1"
         destination: shutdown.sh
@@ -138,38 +152,19 @@ deployment_groups:
     source: modules/scripts/startup-script
     settings:
       runners:
-      - $(appfs.install_nfs_client_runner)
       - type: shell
-        content: mkdir -p /apps && mount -t nfs 10.156.151.74:/nfsshare /apps
-        destination: mount_apps_fs.sh
+        source: modules/startup-script/examples/install_ansible.sh
+        destination: install_ansible.sh
+      - $(appfs.install_nfs_client_runner)
+      - $(appfs.mount_runner)
       - $(spack.setup_spack_runner)
-      - type: data
-        destination: /apps/wrfv3/submit_wrfv3.sh
-        content: |
-          #!/bin/bash
-          source /apps/spack/share/spack/setup-env.sh
-          spack env activate wrfv3
-          mkdir --parents /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
-          cd /apps/${BATCH_JOB_ID}/$BATCH_TASK_INDEX
-          cp /apps/wrfv3/bench_12km/* .
-          WRF=`spack location -i wrf`
-          ln -s $WRF/run/* .
-
-          if [ $BATCH_TASK_INDEX = 0 ]
-          then
-            echo "nstest about to run mpi"
-            mpirun  -hostfile $BATCH_HOSTS_FILE -np 4 -ppn 2 wrf.exe
-            echo "nstest finished running mpi"ls
-            
-          fi
 
   - id: batch-job
     source: ./community/modules/scheduler/cloud-batch-job
     use: [network1, appfs, batch-startup]
     settings:
       runnable: . /apps/wrfv3/submit_wrfv3.sh;
-      machine_type: n2-standard-4
-      job_id: wrf-mpi-2-node
+      machine_type: c2-standard-60
       task_count: 2
       mpi_mode: true
 
