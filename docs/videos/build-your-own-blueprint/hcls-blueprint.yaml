@@ -12,6 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+### Instructions ###
+# git clone https://github.com/nick-stroud/hpc-toolkit.git
+# git checkout hcls_mega_blueprint
+# make
+# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml --vars project_id=<project> --vars homefs_server_ip=1.1.1.1 --vars appsfs_server_ip=1.1.1.1
+# Deploy setup stage - you may have to tinker with bucket names to find a clean namespace
+# Upload tarball to user-provided-software bucket
+# populate ip addresses for filestores
+# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml --vars project_id=<project> -w
+# Deploy primary stage
+# go to https://remotedesktop.google.com/headless and set up crd
+# open terminal and run vmd
+
 ---
 
 blueprint_name: hcls-cluster
@@ -22,54 +35,73 @@ vars:
   region: us-central1
   zone: us-central1-c
 
+  network_name: hcls-cluster-net
+  subnetwork_name: primary-subnet
+  bucket_name_software: user-provided-software
+  bucket_name_inputs: input-bucket-ns
+  bucket_name_outputs: output-bucket-ns
+  use_deployment_name_in_bucket_name: false
+  homefs_server_ip: 10.227.218.146
+  appsfs_server_ip: 10.34.67.218
+
 deployment_groups:
-- group: primary
+- group: setup
   modules:
 
   ### Network ###
 
-  - id: network1
+  - id: network-create
     source: modules/network/vpc
 
   ### Resource Monitoring ###
 
-  - id: hpc_dash
+  - id: hpc-dash
     source: modules/monitoring/dashboard
 
   ### Storage ###
 
-  - id: homefs
+  - id: homefs-create
     source: modules/file-system/filestore
-    use: [network1]
-    settings: {local_mount: /home}
+    use: [network-create]
+    settings: {name: home}
 
-  - id: appsfs
+  - id: appsfs-create
     source: modules/file-system/filestore
-    use: [network1]
-    settings: {local_mount: /apps}
+    use: [network-create]
+    settings: {name: apps}
 
-  # - id: lustrefs
-  #   source: community/modules/file-system/DDN-EXAScaler
-  #   use: [network1]
-  #   settings: {local_mount: /scratch}
-
-  - id: bucket-input  # TODO: Needs to land
-    source: community/modules/file-system/gcs-bucket
-    use: [network1]
+  - id: bucket-software-create
+    source: github.com/GoogleCloudPlatform/hpc-toolkit//community/modules/file-system/cloud-storage-bucket?ref=develop
     settings:
-      prefix: inputs
-      local_mount: /data_input
+      name_prefix: $(vars.bucket_name_software)
 
-  - id: bucket-outputs  # TODO: Needs to land
-    source: community/modules/file-system/gcs-bucket
-    use: [network1]
+  - id: bucket-input-create
+    source: github.com/GoogleCloudPlatform/hpc-toolkit//community/modules/file-system/cloud-storage-bucket?ref=develop
     settings:
-      prefix: outputs
-      local_mount: /data_output
+      name_prefix: $(vars.bucket_name_inputs)
+
+  - id: bucket-output-create
+    source: github.com/GoogleCloudPlatform/hpc-toolkit//community/modules/file-system/cloud-storage-bucket?ref=develop
+    settings:
+      name_prefix: $(vars.bucket_name_outputs)
+
+- group: software_installation
+  modules:
+
+  - id: network-install
+    source: modules/network/pre-existing-vpc
+
+  - id: appsfs-install
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      server_ip: $(vars.appsfs_server_ip)
+      remote_mount: nfsshare
+      local_mount: /apps
+      fs_type: nfs
 
   ### Software ###
 
-  - id: spack  # TODO: Add VMD and other software
+  - id: spack  # TODO: Add other software
     source: community/modules/scripts/spack-install
     settings:
       install_dir: /apps/spack
@@ -123,9 +155,9 @@ deployment_groups:
               - - $%compilers
               - - $^mpis
       # Un-comment and update mirror_url to install from spack cache
-      # spack_cache_url:
-      # - mirror_name: gcs_cache
-      #   mirror_url: gs://optionally_set_spack_cache_bucket
+      spack_cache_url:
+      - mirror_name: gcs_cache
+        mirror_url: gs://hpc-toolkit-demos
 
   - id: spack-builder-startup  # TODO: Update example or make generic
     source: modules/scripts/startup-script
@@ -178,24 +210,82 @@ deployment_groups:
 
   - id: spack-builder
     source: modules/compute/vm-instance
-    use: [network1, appsfs, spack-builder-startup]
+    use: [network-install, appsfs-install, spack-builder-startup]
     settings:
       name_prefix: spack-builder
-      machine_type: c2-standard-30
+      machine_type: c2-standard-16  # TODO Consider bumping up, left low for quota
+
+- group: cluster
+  modules:
+
+  - id: network1
+    source: modules/network/pre-existing-vpc
+
+  - id: homefs
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      server_ip: $(vars.homefs_server_ip)
+      remote_mount: nfsshare
+      local_mount: /home
+      fs_type: nfs
+
+  - id: appsfs
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      server_ip: $(vars.appsfs_server_ip)
+      remote_mount: nfsshare
+      local_mount: /apps
+      fs_type: nfs
+
+  - id: bucket-software
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.bucket_name_software)
+      local_mount: /user_provided_software
+      fs_type: gcsfuse
+      mount_options: defaults,_netdev,implicit_dirs
+
+  - id: bucket-input
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.bucket_name_inputs)
+      local_mount: /data_input
+      fs_type: gcsfuse
+      mount_options: defaults,_netdev,implicit_dirs
+
+  - id: bucket-output
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.bucket_name_outputs)
+      local_mount: /data_output
+      fs_type: gcsfuse
+      mount_options: defaults,_netdev,implicit_dirs
 
   ### Virtual Desktop ###
 
-  - id: desktop  # TODO: Needs to land
-    source: community/modules/remote-desktop/chrome-remote-desktop
+  - id: desktop
+    source: github.com/saltysoup/hpc-toolkit//community/modules/remote-desktop/chrome-remote-desktop?ref=3c10ca8b2114e4d86c511324659006013905eae4
     use:
     - network1
     - homefs
     - appsfs
-    - bucket-inputs
-    - bucket-outputs
-    outputs: [instructions]
+    - bucket-input
+    - bucket-output
+    - bucket-software
+    # outputs: [instructions] TODO
     settings:
+      name_prefix: chrome-remote-desktop
       install_nvidia_driver: true
+      startup_script: |
+        sudo apt-get update
+        sudo apt-get -y upgrade
+        cp /user_provided_software/vmd-1.9.3.bin.LINUXAMD64-CUDA8-OptiX4-OSPRay111p1.opengl.tar.gz .
+        tar xvzf vmd-1.9.3.bin.LINUXAMD64-CUDA8-OptiX4-OSPRay111p1.opengl.tar.gz
+        cd vmd-1.9.3/
+        ./configure
+        cd src/
+        sudo make install
+        cd ../..
 
   ### Cluster ###
 
@@ -209,11 +299,11 @@ deployment_groups:
     source: community/modules/compute/schedmd-slurm-gcp-v5-partition
     use:
     - network1
+    - debug_node_group
     - homefs
     - appsfs
-    - bucket-inputs
-    - bucket-outputs
-    - debug_node_group
+    - bucket-input
+    - bucket-output
     settings:
       partition_name: debug
       enable_placement: false
@@ -228,11 +318,11 @@ deployment_groups:
     source: community/modules/compute/schedmd-slurm-gcp-v5-partition
     use:
     - network1
+    - compute_node_group
     - homefs
     - appsfs
-    - bucket-inputs
-    - bucket-outputs
-    - compute_node_group
+    - bucket-input
+    - bucket-output
     settings:
       partition_name: compute
 
@@ -244,8 +334,8 @@ deployment_groups:
     - compute_partition
     - homefs
     - appsfs
-    - bucket-inputs
-    - bucket-outputs
+    - bucket-input
+    - bucket-output
     settings:
       disable_controller_public_ips: false
 
@@ -256,8 +346,8 @@ deployment_groups:
     - slurm_controller
     - homefs
     - appsfs
-    - bucket-inputs
-    - bucket-outputs
+    - bucket-input
+    - bucket-output
     settings:
       machine_type: n2-standard-4
       disable_login_public_ips: false
