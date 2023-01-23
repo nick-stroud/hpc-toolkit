@@ -251,7 +251,7 @@ deployment_groups:
       remote_mount: $(vars.bucket_name_inputs)
       local_mount: /data_input
       fs_type: gcsfuse
-      mount_options: defaults,_netdev,implicit_dirs
+      mount_options: defaults,_netdev,implicit_dirs,allow_other
 
   - id: bucket-output
     source: modules/file-system/pre-existing-network-storage
@@ -259,7 +259,7 @@ deployment_groups:
       remote_mount: $(vars.bucket_name_outputs)
       local_mount: /data_output
       fs_type: gcsfuse
-      mount_options: defaults,_netdev,implicit_dirs
+      mount_options: defaults,_netdev,implicit_dirs,allow_other
 
   ### Virtual Desktop ###
 
