@@ -45,6 +45,23 @@ vars:
   appsfs_server_ip: 10.34.67.218
 
 deployment_groups:
+- group: enable_apis
+  modules:
+
+  ### Enable APIs ###
+
+  - id: services-api
+    source: community/modules/project/service-enablement
+    settings:
+      gcp_service_list:
+      - file.googleapis.com
+      - iam.googleapis.com
+      - pubsub.googleapis.com
+      - secretmanager.googleapis.com
+      - serviceusage.googleapis.com
+      - compute.googleapis.com
+      - stackdriver.googleapis.com
+
 - group: setup
   modules:
 
