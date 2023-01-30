@@ -16,11 +16,23 @@
 # git clone https://github.com/nick-stroud/hpc-toolkit.git
 # git checkout hcls_mega_blueprint
 # make
-# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml --vars project_id=<project> --vars homefs_server_ip=1.1.1.1 --vars appsfs_server_ip=1.1.1.1
+# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml \
+#   --vars project_id=<project> \
+#   --vars homefs_server_ip=1.1.1.1 \
+#   --vars appsfs_server_ip=1.1.1.1 \
+#   --vars bucket_name_inputs=<input bucket name> \
+#   --vars bucket_name_outputs=<output bucket name> \
+#   --vars bucket_name_software=<software bucket name>
 # Deploy setup stage - you may have to tinker with bucket names to find a clean namespace
 # Upload tarball to user-provided-software bucket
 # populate ip addresses for filestores
-# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml --vars project_id=<project> -w  --vars homefs_server_ip=<home fs ip> --vars appsfs_server_ip=<apps fs ip>
+# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml -w \
+#   --vars project_id=<project_id> \
+#   --vars homefs_server_ip=<home ip> \
+#   --vars appsfs_server_ip=<apps ip> \
+#   --vars bucket_name_inputs=<input bucket name> \
+#   --vars bucket_name_outputs=<output bucket name> \
+#   --vars bucket_name_software=<software bucket name>
 # Deploy primary stage
 # go to https://remotedesktop.google.com/headless and set up crd
 # open terminal and run vmd
@@ -276,7 +288,7 @@ deployment_groups:
       remote_mount: $(vars.bucket_name_outputs)
       local_mount: /data_output
       fs_type: gcsfuse
-      mount_options: defaults,_netdev,implicit_dirs,allow_other
+      mount_options: defaults,_netdev,implicit_dirs,allow_other,dir_mode=0777,file_mode=766
 
   ### Virtual Desktop ###
 
