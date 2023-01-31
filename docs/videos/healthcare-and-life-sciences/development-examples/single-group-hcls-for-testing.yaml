@@ -1,10 +1,10 @@
 ---
 
-blueprint_name: slurm-old-cache
+blueprint_name: ahlin-hcls-test
 
 vars:
-  project_id: nickstroud-2023-01-31
-  deployment_name: gro-old-cache
+  project_id: my-project-mpi-210621
+  deployment_name: ahlin-hcls-test
   region: us-central1
   zone: us-central1-c
 
@@ -19,7 +19,7 @@ deployment_groups:
   - id: appsfs
     source: modules/file-system/filestore
     use: [network1]
-    settings:
+    settings: 
       name: apps
       local_mount: /apps
 
@@ -57,7 +57,7 @@ deployment_groups:
                 - spec: slurm@21-08-8-2
                   prefix: /usr/local
               buildable: False
-      compilers: [gcc@9.3.0 target=x86_64]
+      compilers: [gcc@11.3.0 target=x86_64]
       environments:
       - name: gromacs
         type: file
@@ -65,17 +65,24 @@ deployment_groups:
           spack:
             definitions:
             - compilers:
-              - gcc@9.3.0
+              - gcc@11.3.0
             - mpis:
-              - intel-mpi@2018.4.274
+              - openmpi@4.1.4
+            - cudas:
+              - cuda@11.8.0
             - mpi_packages:
-              - gromacs@2020.5
+              - gromacs@2022.4
             specs:
+            - matrix:
+              - - $cudas
+              - - $%compilers
             - matrix:
               - - $mpis
               - - $%compilers
+              - - $^cudas
             - matrix:
               - - $mpi_packages
+              - - $cudas
               - - $%compilers
               - - $^mpis
       spack_cache_url:
@@ -105,9 +112,11 @@ deployment_groups:
         destination: /apps/gromacs/submit_gromacs.sh
         content: |
           #!/bin/bash
-          #SBATCH -N 2
-          #SBATCH --ntasks-per-node 30
+          #SBATCH -N 1 
+          #SBATCH --ntasks-per-node 3
           #SBATCH -p gpu
+          #SBATCH --gpus 2
+
 
           # Size can be 0000.65  0000.96  0001.5  0003  0006  0012  0024  0048  0096  0192  0384  0768  1536  3072
           # Type can be 'pme' or 'rf'
@@ -120,8 +129,14 @@ deployment_groups:
           cd $SLURM_SUBMIT_DIR
           cp /apps/gromacs/water-cut1.0_GMX50_bare/1536/* .
           scontrol show hostnames ${SLURM_JOB_NODELIST} > hostfile
+
           gmx_mpi grompp -f pme.mdp -c conf.gro -p topol.top -o input.tpr
-          mpirun -n 60 -hostfile hostfile -ppn 30 gmx_mpi mdrun -notunepme -dlb yes -v -resethway -noconfout -nsteps 4000 -s input.tpr
+
+          mpirun -cpus-per-rank 6 -report-bindings -n 2 -H localhost,localhost \
+            env GMX_ENABLE_DIRECT_GPU_COMM=true \
+            gmx_mpi mdrun -v -nsteps 100000 -resetstep 90000 -noconfout -ntomp 10 -ntomp_pme 2 \
+            -npme 1 -pme gpu -update gpu -nb gpu -bonded gpu -nstlist 400 -gputasks 011 \
+            -s input.tpr
 
       - type: shell  # TODO: consider making bool option
         destination: shutdown.sh
@@ -137,8 +152,7 @@ deployment_groups:
     use: [network1, appsfs, spack-builder-startup]
     settings:
       name_prefix: spack-builder
-      machine_type: a2-highgpu-2g  # TODO Consider bumping up, left low for quota
-      threads_per_core: 2
+      machine_type: a2-highgpu-1g  # TODO Consider bumping up, left low for quota
 
   ### Cluster ###
   - id: gpu_node_group
