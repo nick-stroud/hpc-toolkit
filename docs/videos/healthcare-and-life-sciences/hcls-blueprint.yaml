@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,31 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-### Instructions ###
-# git clone https://github.com/nick-stroud/hpc-toolkit.git
-# git checkout hcls_mega_blueprint
-# make
-# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml \
-#   --vars project_id=<project> \
-#   --vars homefs_server_ip=1.1.1.1 \
-#   --vars appsfs_server_ip=1.1.1.1 \
-#   --vars bucket_name_inputs=<input bucket name> \
-#   --vars bucket_name_outputs=<output bucket name> \
-#   --vars bucket_name_software=<software bucket name>
-# Deploy setup stage - you may have to tinker with bucket names to find a clean namespace
-# Upload tarball to user-provided-software bucket
-# populate ip addresses for filestores
-# ./ghpc create docs/videos/build-your-own-blueprint/hcls-blueprint.yaml -w \
-#   --vars project_id=<project_id> \
-#   --vars homefs_server_ip=<home ip> \
-#   --vars appsfs_server_ip=<apps ip> \
-#   --vars bucket_name_inputs=<input bucket name> \
-#   --vars bucket_name_outputs=<output bucket name> \
-#   --vars bucket_name_software=<software bucket name>
-# Deploy primary stage
-# go to https://remotedesktop.google.com/headless and set up crd
-# open terminal and run vmd
 
 ---
 
@@ -130,7 +105,7 @@ deployment_groups:
 
   ### Software ###
 
-  - id: spack  # TODO: Add other software
+  - id: spack
     source: community/modules/scripts/spack-install
     settings:
       install_dir: /apps/spack
@@ -194,7 +169,7 @@ deployment_groups:
       runners:
       - $(spack.install_spack_deps_runner)
       - $(spack.install_spack_runner)
-      - type: shell  # consider removing
+      - type: shell
         destination: setup_gromacs.sh
         content: |
           #!/bin/bash
@@ -213,6 +188,7 @@ deployment_groups:
           #!/bin/bash
           #SBATCH -N 2
           #SBATCH --ntasks-per-node 30
+          #SBATCH -p compute
 
           # Size can be 0000.65  0000.96  0001.5  0003  0006  0012  0024  0048  0096  0192  0384  0768  1536  3072
           # Type can be 'pme' or 'rf'
