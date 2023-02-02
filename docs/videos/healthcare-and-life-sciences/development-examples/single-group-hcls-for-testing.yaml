@@ -136,16 +136,16 @@ deployment_groups:
           source /apps/spack/share/spack/setup-env.sh
           spack env activate gromacs
 
-          # Check that gmx_mpi exists
-          which gmx_mpi
+          # Check that gmx exists
+          which gmx
           cd $SLURM_SUBMIT_DIR
           cp /apps/gromacs/water-cut1.0_GMX50_bare/1536/* .
 
-          gmx_mpi grompp -f pme.mdp -c conf.gro -p topol.top -o input.tpr
+          gmx grompp -f pme.mdp -c conf.gro -p topol.top -o input.tpr
 
           mpirun -cpus-per-rank 6 -report-bindings -n 2 -H localhost,localhost \
             env GMX_ENABLE_DIRECT_GPU_COMM=true \
-            gmx_mpi mdrun -v -nsteps 100000 -resetstep 90000 -noconfout -ntomp 10 -ntomp_pme 2 \
+            gmx mdrun -v -nsteps 100000 -resetstep 90000 -noconfout -ntomp 10 -ntomp_pme 2 \
             -npme 1 -pme gpu -update gpu -nb gpu -bonded gpu -nstlist 400 -gputasks 011 \
             -s input.tpr
 
