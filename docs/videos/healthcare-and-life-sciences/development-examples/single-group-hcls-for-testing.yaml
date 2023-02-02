@@ -19,7 +19,7 @@ deployment_groups:
   - id: appsfs
     source: modules/file-system/filestore
     use: [network1]
-    settings: 
+    settings:
       name: apps
       local_mount: /apps
 
@@ -64,27 +64,34 @@ deployment_groups:
         content: |
           spack:
             definitions:
-            - compilers:
-              - gcc@11.3.0
-            - mpis:
-              - openmpi@4.1.4
-            - cudas:
-              - cuda@11.8.0
-            - mpi_packages:
-              - gromacs@2022.4
+              - compilers:
+                  - gcc@11.3.0
+              - cudas:
+                  - cuda@11.8.0
+              - cuda_mpis:
+                  - openmpi@4.1.4+cuda
+              - mpi_cuda_packages:
+                  - gromacs@2022.4+cuda
+              - cuda_packages:
+                  - gromacs@2022.4+cuda~mpi
             specs:
+            - $compilers
             - matrix:
-              - - $cudas
-              - - $%compilers
+                - [$cudas]
+                - [$%compilers]
             - matrix:
-              - - $mpis
-              - - $%compilers
-              - - $^cudas
+                - [$cuda_mpis]
+                - [$%compilers]
+                - [$^cudas]
             - matrix:
-              - - $mpi_packages
-              - - $cudas
-              - - $%compilers
-              - - $^mpis
+                - [$mpi_cuda_packages]
+                - [$^cudas]
+                - [$^cuda_mpis]
+                - [$%compilers]
+            - matrix:
+                - [$cuda_packages]
+                - [$^cudas]
+                - [$%compilers]
       spack_cache_url:
       - mirror_name: gcs_cache
         mirror_url: gs://hpc-toolkit-demos
@@ -112,7 +119,7 @@ deployment_groups:
         destination: /apps/gromacs/submit_gromacs.sh
         content: |
           #!/bin/bash
-          #SBATCH -N 1 
+          #SBATCH -N 1
           #SBATCH --ntasks-per-node 3
           #SBATCH -p gpu
           #SBATCH --gpus 2
