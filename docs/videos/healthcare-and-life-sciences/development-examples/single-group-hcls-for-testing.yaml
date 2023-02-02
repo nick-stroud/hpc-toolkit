@@ -96,6 +96,8 @@ deployment_groups:
                 - [$^cudas]
                 - [$%compilers]
       spack_cache_url:
+      - mirror_name: my_cache
+        mirror_url: gs://spack-cache-ns-2023-01-31
       - mirror_name: gcs_cache
         mirror_url: gs://hpc-toolkit-demos
 
