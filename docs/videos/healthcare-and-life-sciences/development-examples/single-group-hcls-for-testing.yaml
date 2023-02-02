@@ -74,9 +74,9 @@ deployment_groups:
               - cuda_mpis:
                   - openmpi@4.1.4+cuda
               - mpi_cuda_packages:
-                  - gromacs@2022.4+cuda
+                  - gromacs@2022.3+cuda
               - cuda_packages:
-                  - gromacs@2022.4+cuda~mpi
+                  - gromacs@2022.3+cuda~mpi
             specs:
             - $compilers
             - matrix:
@@ -177,7 +177,7 @@ deployment_groups:
     source: community/modules/compute/schedmd-slurm-gcp-v5-partition
     use:
     - network1
-    - compute_node_group
+    - gpu_node_group
     - appsfs
     settings:
       partition_name: gpu
