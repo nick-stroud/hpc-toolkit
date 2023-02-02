@@ -140,7 +140,6 @@ deployment_groups:
           which gmx_mpi
           cd $SLURM_SUBMIT_DIR
           cp /apps/gromacs/water-cut1.0_GMX50_bare/1536/* .
-          scontrol show hostnames ${SLURM_JOB_NODELIST} > hostfile
 
           gmx_mpi grompp -f pme.mdp -c conf.gro -p topol.top -o input.tpr
 
@@ -160,7 +159,7 @@ deployment_groups:
           fi
 
   - id: spack-builder
-    source: modules/compute/vm-instance
+    source: ./modules/compute/vm-instance
     use: [network1, appsfs, spack-builder-startup]
     settings:
       name_prefix: spack-builder
