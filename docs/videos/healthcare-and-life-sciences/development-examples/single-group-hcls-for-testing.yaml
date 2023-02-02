@@ -3,7 +3,7 @@
 blueprint_name: ahlin-hcls-test
 
 vars:
-  project_id: my-project-mpi-210621
+  project_id: nickstroud-2023-01-31
   deployment_name: ahlin-hcls-test
   region: us-central1
   zone: us-central1-c
@@ -28,6 +28,9 @@ deployment_groups:
   - id: spack
     source: community/modules/scripts/spack-install
     settings:
+      caches_to_populate:
+      - type: 'mirror'
+        path: gs://spack-cache-ns-2023-01-31
       install_dir: /apps/spack
       configs:
       - type: file
@@ -159,6 +162,7 @@ deployment_groups:
     use: [network1, appsfs, spack-builder-startup]
     settings:
       name_prefix: spack-builder
+      threads_per_core: 2
       machine_type: a2-highgpu-1g  # TODO Consider bumping up, left low for quota
 
   ### Cluster ###
