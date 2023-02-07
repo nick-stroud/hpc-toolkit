@@ -3,8 +3,8 @@
 blueprint_name: ahlin-hcls-test
 
 vars:
-  project_id: nickstroud-2023-01-31
-  deployment_name: ahlin-hcls-test
+  project_id: ns-playground-2023-02-05
+  deployment_name: fresh-build
   region: us-central1
   zone: us-central1-c
 
@@ -20,7 +20,6 @@ deployment_groups:
     source: modules/file-system/filestore
     use: [network1]
     settings:
-      filestore_share_name: apps
       local_mount: /apps
 
   ### Software ###
@@ -28,9 +27,9 @@ deployment_groups:
   - id: spack
     source: community/modules/scripts/spack-install
     settings:
-      caches_to_populate:
-      - type: 'mirror'
-        path: gs://spack-cache-ns-2023-01-31
+      # caches_to_populate:
+      # - type: 'mirror'
+      #   path: gs://spack-cache-ns-2023-02-03
       install_dir: /apps/spack
       configs:
       - type: file
@@ -91,18 +90,25 @@ deployment_groups:
                 - [$^cuda_mpis]
                 - [$%compilers]
                 - [target=skylake]
-      spack_cache_url:
-      - mirror_name: my_cache
-        mirror_url: gs://spack-cache-ns-2023-01-31
-      - mirror_name: gcs_cache
-        mirror_url: gs://hpc-toolkit-demos
+      # spack_cache_url:
+      # - mirror_name: my_cache
+      #   mirror_url: gs://spack-cache-ns-2023-01-31
+      # - mirror_name: gcs_cache
+      #   mirror_url: gs://hpc-toolkit-demos
 
   - id: spack-builder-startup  # TODO: Update example or make generic
     source: modules/scripts/startup-script
     settings:
       runners:
       - $(spack.install_spack_deps_runner)
-      - $(spack.install_spack_runner)
+
+      - type: data
+        destination: /tmp/install_spack.sh
+        content: $(spack.startup_script)
+      - type: shell
+        destination: run_install_spack_with_env.sh
+        content: NVCC_PREPEND_FLAGS='-arch=all' bash /tmp/install_spack.sh
+
       - type: shell
         destination: setup_gromacs.sh
         content: |
