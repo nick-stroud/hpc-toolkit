@@ -71,7 +71,7 @@ deployment_groups:
               - cudas:
                   - cuda@11.8.0
               - cuda_mpis:
-                  - openmpi@4.1.4+cuda
+                  - openmpi@4.1.4+cuda+legacylaunchers
               - mpi_cuda_packages:
                   - gromacs@2022.3+cuda+mpi
             specs:
@@ -83,6 +83,7 @@ deployment_groups:
                 - [$cuda_mpis]
                 - [$%compilers]
                 - [$^cudas]
+                - [^slurm]
                 - [target=skylake]
             - matrix:
                 - [$mpi_cuda_packages]
@@ -166,7 +167,7 @@ deployment_groups:
     settings:
       name_prefix: spack-builder
       threads_per_core: 2
-      machine_type: a2-highgpu-1g  # TODO Consider bumping up, left low for quota
+      machine_type: c2-standard-60  # TODO Consider bumping up, left low for quota
 
   ### Cluster ###
   - id: gpu_node_group
@@ -174,7 +175,7 @@ deployment_groups:
     settings:
       enable_smt: true
       node_count_dynamic_max: 20
-      machine_type: a2-highgpu-2g
+      machine_type: a2-highgpu-1g
 
   - id: gpu_partition
     source: community/modules/compute/schedmd-slurm-gcp-v5-partition
