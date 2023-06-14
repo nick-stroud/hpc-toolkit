@@ -35,15 +35,21 @@ variable "network_storage" {
 variable "filestore_id" {
   description = "An identifier for a filestore with the format `projects/{{project}}/locations/{{location}}/instances/{{name}}`."
   type        = string
+  default     = null
   validation {
     condition     = length(split("/", var.filestore_id)) == 6
     error_message = "filestore_id must be in the format of 'projects/{{project}}/locations/{{location}}/instances/{{name}}'."
   }
 }
 
+variable "service_account_email" {
+  default = null
+}
+
 variable "capacity_gb" {
   description = "The storage capacity with which to create the persistent volume."
   type        = number
+  default     = null
 }
 
 variable "labels" {
