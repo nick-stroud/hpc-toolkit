@@ -77,7 +77,25 @@ provider "kubectl" {
 }
 
 resource "kubectl_manifest" "filestore_pv" {
-  yaml_body = local.filestore_pv_contents
+  yaml_body = (
+    var.network_storage.fs_type == "gcsfuse" ? 
+    local.gcs_pv_contents : 
+    local.filestore_pv_contents
+  )
+  lifecycle {
+    precondition {
+      condition     = contains(["gcsfuse", "nfs"], var.network_storage.fs_type)
+      error_message = "Only fs_type gcsfuse or nfs are supported."
+    }
+    precondition {
+      condition     = var.network_storage.fs_type == "gcsfuse" == (var.filestore_id == null)
+      error_message = "filestore_id should not be provided when using a gcs bucket."
+    }
+    precondition {
+      condition     = var.service_account_email != null ? var.network_storage.fs_type == "gcsfuse" : true
+      error_message = "Service account can only be provided when used with a GCS bucket."
+    }
+  }
 }
 
 resource "kubectl_manifest" "filestore_pvc" {
